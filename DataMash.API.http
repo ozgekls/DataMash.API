@@ -1,0 +1,6 @@
+@DataMash.API_HostAddress = http://localhost:5027
+
+GET {{DataMash.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
