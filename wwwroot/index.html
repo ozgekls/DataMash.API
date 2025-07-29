@@ -37,29 +37,54 @@
   </div>
 
   <script>
-    const form = document.getElementById('stressForm');
-    const result = document.getElementById('result');
+  const form = document.getElementById('stressForm');
+  const result = document.getElementById('result');
 
-    form.addEventListener('submit', function(e) {
-      e.preventDefault();
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
 
-      const date = form.date.value;
-      const stress = form.stress.value;
-      const emotion = form.emotion.value;
-      const note = form.note.value;
+    const date = form.date.value;
+    const stress = form.stress.value;
+    const emotion = form.emotion.value;
+    const note = form.note.value;
 
-      const data = {
-        date,
-        stress: parseInt(stress),
-        emotion: emotion || null,
-        note: note.trim() || null
-      };
+    const data = {
+      date,
+      stress: parseInt(stress),
+      emotion: emotion || null,
+      note: note.trim() || null
+    };
 
-      result.innerHTML = `
-        <h3>✅ Kayıt Alındı:</h3>
-       
-      `;
-    });
-  </script>
+    try {
+      const response = await fetch("http://localhost:5027/api/stress", {
+
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        result.innerHTML = `
+          <h3>✅ Kayıt alındı!</h3>
+          <p><strong>Tarih:</strong> ${date}</p>
+          <p><strong>Stres Seviyesi:</strong> ${stress}</p>
+          <p><strong>Duygusal Etiket:</strong> ${emotion || "Boş"}</p>
+          <p><strong>Not:</strong> ${note || "Boş"}</p>
+        `;
+        form.reset();
+        document.getElementById("stressValue").innerText = "5";
+      } else {
+        result.innerHTML = `<p style="color:red;">Hata: ${response.status}</p>`;
+      }
+    } catch (error) {
+      console.error("Hata:", error);
+      result.innerHTML = `<p style="color:red;">Sunucuya ulaşılamadı!</p>`;
+    }
+  });
+</script>
+
+  
 </body>
 </html>
