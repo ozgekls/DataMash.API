@@ -24,6 +24,13 @@ builder.Services.AddDbContext<DataMashContext>(options =>
     )
 );
 
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    });
+
+
 var app = builder.Build();
 
 app.UseDefaultFiles();    // wwwroot/index.html açılabilsin
@@ -41,7 +48,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowAll");
 app.MapControllers();
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 
 

@@ -33,6 +33,13 @@
       <button type="submit">Kaydet</button>
     </form>
 
+    <!-- Kayıtları Göster Butonu -->
+    <button onclick="loadRecords()" style="margin-top: 20px;">📋 Kayıtları Göster</button>
+
+    <!-- Kayıtların Görüneceği Alan -->
+    <div id="listArea" style="margin-top: 20px;"></div>
+
+
     <div id="result"></div>
   </div>
 
@@ -43,32 +50,41 @@
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
 
-    const date = form.date.value;
-    const stress = form.stress.value;
-    const emotion = form.emotion.value;
-    const note = form.note.value;
+  const rawDate = document.getElementById("date").value; // format: '2025-07-11' gibi bekleniyor
+  const selectedDate = new Date(rawDate);
+  selectedDate.setHours(0, 0, 0, 0);
 
-    const data = {
-      date,
-      stress: parseInt(stress),
-      emotion: emotion || null,
-      note: note.trim() || null
-    };
+  const formattedDateOnly = selectedDate.toLocaleDateString('en-CA'); // YYYY-MM-DD
+
+  const stress = form.stress.value;
+  const emotion = form.emotion.value;
+  const note = form.note.value;
+
+  const data = {
+    date: selectedDate.toISOString(),
+    stress: parseInt(stress),
+    emotion: emotion || null,
+    note: note.trim() || null
+};
+
+  
+
+
 
     try {
-      const response = await fetch("http://localhost:5027/api/stress", {
+      const response = await fetch(`http://localhost:5027/api/stress/${formattedDateOnly}`, {
 
-        method: "POST",
-        headers: {
+      method: "PUT",
+      headers: {
           "Content-Type": "application/json"
-        },
-        body: JSON.stringify(data)
-      });
+      },
+      body: JSON.stringify(data)
+  });
 
       if (response.ok) {
         result.innerHTML = `
           <h3>✅ Kayıt alındı!</h3>
-          <p><strong>Tarih:</strong> ${date}</p>
+          <p><strong>Tarih:</strong> ${formattedDateOnly}</p>
           <p><strong>Stres Seviyesi:</strong> ${stress}</p>
           <p><strong>Duygusal Etiket:</strong> ${emotion || "Boş"}</p>
           <p><strong>Not:</strong> ${note || "Boş"}</p>
@@ -83,6 +99,48 @@
       result.innerHTML = `<p style="color:red;">Sunucuya ulaşılamadı!</p>`;
     }
   });
+  
+  // JS'de gösterim için (fetch sonrası)
+      const formattedDate = new Date(record.date).toLocaleDateString('tr-TR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long'
+      });
+
+  async function loadRecords() {
+  try {
+    const response = await fetch("http://localhost:5027/api/stress"); // port 5027!
+    const data = await response.json();
+
+    const listArea = document.getElementById("listArea");
+
+    if (data.length === 0) {
+      listArea.innerHTML = "<p>Henüz kayıt yok.</p>";
+      return;
+    }
+
+    // Listeyi oluştur
+    listArea.innerHTML = `
+      <h3>📌 Kayıtlar</h3>
+      <ul style="list-style-type: none; padding: 0;">
+        ${data.map(item => `
+          <li style="margin-bottom: 10px; background: #f1f1f1; padding: 10px; border-radius: 8px;">
+            <strong>📅 ${item.date}</strong><br>
+            🔥 Stres: ${item.stress}<br>
+            😊 Duygu: ${item.emotion || "Boş"}<br>
+            📝 Not: ${item.note || "Boş"}
+          </li>
+        `).join("")}
+      </ul>
+    `;
+  } catch (err) {
+    console.error("Veri alma hatası:", err);
+    document.getElementById("listArea").innerHTML = "<p style='color:red;'>Veriler alınamadı!</p>";
+  }
+}
+
+
 </script>
 
   
