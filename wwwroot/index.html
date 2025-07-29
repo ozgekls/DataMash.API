@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Stres Takip Formu</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>📘 Stres Takip Formu</h1>
+
+    <form id="stressForm">
+      <label for="date">📅 Tarih:</label>
+      <input type="date" id="date" name="date" required>
+
+      <label for="stress">📈 Stres Seviyesi (1-10):</label>
+      <input type="range" id="stress" name="stress" min="1" max="10" value="5" oninput="stressValue.innerText = this.value">
+      <span id="stressValue">5</span>
+
+      <label for="emotion">😶 Duygusal Etiket:</label>
+      <select id="emotion" name="emotion">
+        <option value="">(Seçiniz)</option>
+        <option value="Yorgun">Yorgun</option>
+        <option value="Endişeli">Endişeli</option>
+        <option value="Rahat">Rahat</option>
+        <option value="Mutlu">Mutlu</option>
+        <option value="Bıkkın">Bıkkın</option>
+      </select>
+
+      <label for="note">📝 Açıklama (opsiyonel):</label>
+      <textarea id="note" name="note" rows="3" placeholder="Örn: Sınavım vardı, uykusuzdum"></textarea>
+
+      <button type="submit">Kaydet</button>
+    </form>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById('stressForm');
+    const result = document.getElementById('result');
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const date = form.date.value;
+      const stress = form.stress.value;
+      const emotion = form.emotion.value;
+      const note = form.note.value;
+
+      const data = {
+        date,
+        stress: parseInt(stress),
+        emotion: emotion || null,
+        note: note.trim() || null
+      };
+
+      result.innerHTML = `
+        <h3>✅ Kayıt Alındı:</h3>
+        <pre>${JSON.stringify(data, null, 2)}</pre>
+      `;
+    });
+  </script>
+</body>
+</html>
