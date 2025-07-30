@@ -236,77 +236,87 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
       
-  async function loadRecords() {
+  
+async function loadRecords() {
   try {
-    const response = await fetch("http://localhost:5027/api/stress"); // port 5027!
+    const listArea = document.getElementById("listArea");
+    listArea.innerHTML = '<p>⏳ Kayıtlar yükleniyor...</p>';
+
+    const response = await fetch("http://localhost:5027/api/stress");
+    if (!response.ok) throw new Error("Sunucu hatası");
+
     const data = await response.json();
 
-    const listArea = document.getElementById("listArea");
-
     if (data.length === 0) {
-      listArea.innerHTML = "<p>Henüz kayıt yok.</p>";
+      listArea.innerHTML = "<p>📭 Henüz kayıt yok.</p>";
       return;
     }
 
-    // Listeyi oluştur
+    // Kayıtları göster
+    data.sort((a, b) => new Date(b.date) - new Date(a.date));
     listArea.innerHTML = `
-      <h3>📌 Kayıtlar</h3>
+      <h3>📌 Kayıtlar (${data.length} adet)</h3>
       <ul style="list-style-type: none; padding: 0;">
-        ${data.map(item => `
-          <li style="margin-bottom: 10px; background: #f1f1f1; padding: 10px; border-radius: 8px;">
-            <strong>📅 ${item.date}</strong><br>
-            🔥 Stres: ${item.stress}<br>
-            😊 Duygu: ${item.emotion || "Boş"}<br>
-            📝 Not: ${item.note || "Boş"}
-          </li>
-        `).join("")}
+        ${data.map(item => {
+          const formattedDate = new Date(item.date).toLocaleDateString('tr-TR', {
+            year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+          });
+          return `
+            <li style="margin-bottom: 10px; background: #f1f1f1; padding: 10px; border-radius: 8px;">
+              <strong>📅 ${formattedDate}</strong><br>
+              🔥 Stres: ${item.stress}/10<br>
+              😊 Duygu: ${item.emotion || "Belirtilmemiş"}<br>
+              📝 Not: ${item.note || "Not yok"}
+            </li>
+          `;
+        }).join("")}
       </ul>
     `;
-  } catch (err) {
-    console.error("Veri alma hatası:", err);
-    document.getElementById("listArea").innerHTML = "<p style='color:red;'>Veriler alınamadı!</p>";
-  }
-  // 🔹 İstatistik Hesaplama
-  if (data.length === 0) return;
 
-  const total = data.length;
-  const avgStress = data.reduce((sum, entry) => sum + Number(entry.stress), 0) / total;
+    // 🔹 İstatistik Hesaplama
+    const total = data.length;
+    const avgStress = data.reduce((sum, entry) => sum + Number(entry.stress), 0) / total;
 
-  const today = new Date();
-  const last7Days = data.filter(entry => {
-    const entryDate = new Date(entry.date);
-    const diffTime = today - entryDate;
-    const diffDays = diffTime / (1000 * 60 * 60 * 24);
-    return diffDays <= 7;
-  });
-  const last7Avg = last7Days.length > 0
-    ? last7Days.reduce((sum, e) => sum + Number(e.stress), 0) / last7Days.length
-    : 0;
+    const today = new Date();
+    const last7Days = data.filter(entry => {
+      const entryDate = new Date(entry.date);
+      const diffDays = (today - entryDate) / (1000 * 60 * 60 * 24);
+      return diffDays <= 7;
+    });
 
-  const maxStressEntry = data.reduce((max, entry) => {
-    return Number(entry.stress) > Number(max.stress) ? entry : max;
-  }, data[0]);
+    const last7Avg = last7Days.length > 0
+      ? last7Days.reduce((sum, e) => sum + Number(e.stress), 0) / last7Days.length
+      : 0;
 
-  const emotionCounts = {};
-  data.forEach(entry => {
-    if (entry.emotion && entry.emotion.trim() !== "") {
-      emotionCounts[entry.emotion] = (emotionCounts[entry.emotion] || 0) + 1;
-    }
-  });
-  const mostEmotion = Object.entries(emotionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "-";
+    const maxStressEntry = data.reduce((max, entry) => {
+      return Number(entry.stress) > Number(max.stress) ? entry : max;
+    }, data[0]);
 
+    const emotionCounts = {};
+    data.forEach(entry => {
+      if (entry.emotion && entry.emotion.trim() !== "") {
+        emotionCounts[entry.emotion] = (emotionCounts[entry.emotion] || 0) + 1;
+      }
+    });
+    const mostEmotion = Object.entries(emotionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "-";
 
-
-    // DOM’a yaz
+    // 🔸 DOM’a yaz
     document.getElementById("totalRecords").innerText = total;
-    document.getElementById("avgStress").innerText = avg;
-    document.getElementById("last7DaysAvg").innerText = last7Avg;
-    document.getElementById("maxStressDate").innerText = new Date(maxEntry.date).toLocaleDateString("tr-TR");
+    document.getElementById("avgStress").innerText = avgStress.toFixed(1);
+    document.getElementById("last7DaysAvg").innerText = last7Avg.toFixed(1);
+    document.getElementById("maxStressDate").innerText = new Date(maxStressEntry.date).toLocaleDateString("tr-TR");
     document.getElementById("mostEmotion").innerText = mostEmotion;
 
-
-
+  } catch (err) {
+    console.error("Veri alma hatası:", err);
+    document.getElementById("listArea").innerHTML = `
+      <p style='color:red;'>❌ Kayıtlar yüklenemedi!</p>
+      <p style='color:red; font-size:12px;'>Hata: ${err.message}</p>
+    `;
+  }
 }
+
+
 
 
 </script>
