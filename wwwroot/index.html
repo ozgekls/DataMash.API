@@ -41,8 +41,36 @@
 
 
     <div id="result"></div>
+     <!-- İstatistik Paneli -->
+    <div class="stats-container">
+      <h2>📊 İstatistikler</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="totalRecords">-</div>
+          <div class="stat-label">Toplam Kayıt</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="avgStress">-</div>
+          <div class="stat-label">Ortalama Stres</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="last7DaysAvg">-</div>
+          <div class="stat-label">Son 7 Gün Ort.</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="maxStressDate">-</div>
+          <div class="stat-label">Yüksek Stres Günü</div>
+        </div>
+      </div>
+      <p class="most-frequent">En Sık Duygu: <span id="mostEmotion">-</span></p>
+    </div>
+
+
   </div>
 
+ 
+
+  
   <script>
   const form = document.getElementById('stressForm');
   const result = document.getElementById('result');
@@ -71,33 +99,52 @@
 
 
 
-    try {
-      const response = await fetch(`http://localhost:5027/api/stress/${formattedDateOnly}`, {
+  try {
+    const dateValue = document.getElementById("date").value;
 
-      method: "PUT",
-      headers: {
-          "Content-Type": "application/json"
-      },
-      body: JSON.stringify(data)
-  });
+    
+// Tarayıcıdan gelen tarihi standardize et (YYYY-MM-DD)
+    const formattedDate = new Date(dateValue).toISOString().split('T')[0];
 
-      if (response.ok) {
+    // 1️⃣ Var mı diye kontrol et
+    let check = await fetch(`http://localhost:5027/api/stress/raw`);
+    let records = await check.json();
+    let exists = records.find(r => r.date === formattedDate);
+
+    // 2️⃣ URL ve method belirle
+    let url = exists
+        ? `http://localhost:5027/api/stress/${formattedDate}`
+        : "http://localhost:5027/api/stress";
+
+    let method = exists ? "PUT" : "POST";
+
+    // 3️⃣ İstek gönder
+    const response = await fetch(url, {
+        method: method,
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(data)
+    });
+
+    if (response.ok) {
         result.innerHTML = `
           <h3>✅ Kayıt alındı!</h3>
-          <p><strong>Tarih:</strong> ${formattedDateOnly}</p>
+          <p><strong>Tarih:</strong> ${formattedDate}</p>
           <p><strong>Stres Seviyesi:</strong> ${stress}</p>
           <p><strong>Duygusal Etiket:</strong> ${emotion || "Boş"}</p>
           <p><strong>Not:</strong> ${note || "Boş"}</p>
         `;
         form.reset();
         document.getElementById("stressValue").innerText = "5";
-      } else {
+    } else {
         result.innerHTML = `<p style="color:red;">Hata: ${response.status}</p>`;
-      }
-    } catch (error) {
-      console.error("Hata:", error);
-      result.innerHTML = `<p style="color:red;">Sunucuya ulaşılamadı!</p>`;
     }
+} catch (error) {
+    console.error("Hata:", error);
+    result.innerHTML = `<p style="color:red;">Sunucuya ulaşılamadı!</p>`;
+}
+
   });
   
   // JS'de gösterim için (fetch sonrası)
@@ -108,6 +155,8 @@
         weekday: 'long'
       });
 
+
+      
   async function loadRecords() {
   try {
     const response = await fetch("http://localhost:5027/api/stress"); // port 5027!
@@ -138,6 +187,33 @@
     console.error("Veri alma hatası:", err);
     document.getElementById("listArea").innerHTML = "<p style='color:red;'>Veriler alınamadı!</p>";
   }
+  // İstatistik hesaplama
+    const total = data.length;
+    const avg = (data.reduce((sum, e) => sum + e.stress, 0) / total).toFixed(1);
+    const today = new Date();
+    const last7 = data.filter(e => {
+      const d = new Date(e.date);
+      return (today - d) / (1000 * 60 * 60 * 24) <= 7;
+    });
+    const last7Avg = (last7.reduce((sum, e) => sum + e.stress, 0) / (last7.length || 1)).toFixed(1);
+    const maxEntry = data.reduce((max, e) => (e.stress > max.stress ? e : max), data[0]);
+
+    // Duyguların en sık görüleni
+    const emotionCounts = {};
+    data.forEach(e => {
+      if (e.emotion) emotionCounts[e.emotion] = (emotionCounts[e.emotion] || 0) + 1;
+    });
+    const mostEmotion = Object.entries(emotionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "-";
+
+    // DOM’a yaz
+    document.getElementById("totalRecords").innerText = total;
+    document.getElementById("avgStress").innerText = avg;
+    document.getElementById("last7DaysAvg").innerText = last7Avg;
+    document.getElementById("maxStressDate").innerText = new Date(maxEntry.date).toLocaleDateString("tr-TR");
+    document.getElementById("mostEmotion").innerText = mostEmotion;
+
+
+
 }
 
 
