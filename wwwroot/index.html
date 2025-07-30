@@ -75,77 +75,156 @@
   const form = document.getElementById('stressForm');
   const result = document.getElementById('result');
 
-  form.addEventListener('submit', async function (e) {
-    e.preventDefault();
+  // 🔧 Mevcut form submit event listener'ınızı bu kodla değiştirin:
 
-  const rawDate = document.getElementById("date").value; // format: '2025-07-11' gibi bekleniyor
-  const selectedDate = new Date(rawDate);
-  selectedDate.setHours(0, 0, 0, 0);
-
-  const formattedDateOnly = selectedDate.toLocaleDateString('en-CA'); // YYYY-MM-DD
-
-  const stress = form.stress.value;
-  const emotion = form.emotion.value;
-  const note = form.note.value;
-
-  const data = {
-    date: selectedDate.toISOString(),
-    stress: parseInt(stress),
-    emotion: emotion || null,
-    note: note.trim() || null
-};
-
+form.addEventListener('submit', async function (e) {
+  e.preventDefault();
   
-
-
+  // Loading göster
+  result.innerHTML = '<p>⏳ Kaydediliyor...</p>';
 
   try {
     const dateValue = document.getElementById("date").value;
+    const stress = form.stress.value;
+    const emotion = form.emotion.value;
+    const note = form.note.value;
 
-    
-// Tarayıcıdan gelen tarihi standardize et (YYYY-MM-DD)
-    const formattedDate = new Date(dateValue).toISOString().split('T')[0];
+    const data = {
+      date: dateValue, // Sadece YYYY-MM-DD formatında
+      stress: parseInt(stress),
+      emotion: emotion || null,
+      note: note.trim() || null
+    };
 
-    // 1️⃣ Var mı diye kontrol et
-    let check = await fetch(`http://localhost:5027/api/stress/raw`);
-    let records = await check.json();
-    let exists = records.find(r => r.date === formattedDate);
+    // 1️⃣ Önce aynı tarihte kayıt var mı kontrol et
+    let existingRecord = null;
+    try {
+      const checkResponse = await fetch(`http://localhost:5027/api/stress`);
+      if (checkResponse.ok) {
+        const records = await checkResponse.json();
+        existingRecord = records.find(r => {
+          // Tarih karşılaştırması için sadece YYYY-MM-DD kısmını al
+          const recordDate = new Date(r.date).toISOString().split('T')[0];
+          return recordDate === dateValue;
+        });
+      }
+    } catch (checkError) {
+      console.log("Kayıt kontrolü yapılamadı, yeni kayıt olarak devam ediliyor");
+    }
 
     // 2️⃣ URL ve method belirle
-    let url = exists
-        ? `http://localhost:5027/api/stress/${formattedDate}`
-        : "http://localhost:5027/api/stress";
-
-    let method = exists ? "PUT" : "POST";
+    let url, method;
+    if (existingRecord) {
+      // Güncelleme (sunucunuzun endpoint yapısına göre ayarlayın)
+      url = `http://localhost:5027/api/stress/${existingRecord.id || dateValue}`;
+      method = "PUT";
+    } else {
+      // Yeni kayıt
+      url = "http://localhost:5027/api/stress";
+      method = "POST";
+    }
 
     // 3️⃣ İstek gönder
     const response = await fetch(url, {
-        method: method,
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(data)
+      method: method,
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
     });
 
     if (response.ok) {
-        result.innerHTML = `
-          <h3>✅ Kayıt alındı!</h3>
-          <p><strong>Tarih:</strong> ${formattedDate}</p>
-          <p><strong>Stres Seviyesi:</strong> ${stress}</p>
-          <p><strong>Duygusal Etiket:</strong> ${emotion || "Boş"}</p>
-          <p><strong>Not:</strong> ${note || "Boş"}</p>
-        `;
-        form.reset();
-        document.getElementById("stressValue").innerText = "5";
+      const actionText = existingRecord ? "güncellendi" : "kaydedildi";
+      result.innerHTML = `
+        <h3>✅ Kayıt ${actionText}!</h3>
+        <p><strong>Tarih:</strong> ${dateValue}</p>
+        <p><strong>Stres Seviyesi:</strong> ${stress}</p>
+        <p><strong>Duygusal Etiket:</strong> ${emotion || "Boş"}</p>
+        <p><strong>Not:</strong> ${note || "Boş"}</p>
+      `;
+      
+      // Form'u sıfırla ama tarihi koru
+      const currentDate = document.getElementById("date").value;
+      form.reset();
+      document.getElementById("date").value = currentDate;
+      document.getElementById("stressValue").innerText = "5";
     } else {
-        result.innerHTML = `<p style="color:red;">Hata: ${response.status}</p>`;
+      const errorText = await response.text();
+      result.innerHTML = `<p style="color:red;">❌ Hata: ${response.status} - ${errorText}</p>`;
     }
-} catch (error) {
-    console.error("Hata:", error);
-    result.innerHTML = `<p style="color:red;">Sunucuya ulaşılamadı!</p>`;
+  } catch (error) {
+    console.error("Bağlantı hatası:", error);
+    result.innerHTML = `
+      <p style="color:red;">❌ Sunucuya bağlanılamadı!</p>
+      <p style="color:red; font-size:12px;">Sunucunun çalıştığından emin olun (http://localhost:5027)</p>
+      <p style="color:red; font-size:12px;">Hata detayı: ${error.message}</p>
+    `;
+  }
+});
+
+// 🔧 loadRecords fonksiyonunuzu da bu kodla değiştirin:
+
+async function loadRecords() {
+  try {
+    const listArea = document.getElementById("listArea");
+    listArea.innerHTML = '<p>⏳ Kayıtlar yükleniyor...</p>';
+
+    const response = await fetch("http://localhost:5027/api/stress");
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (data.length === 0) {
+      listArea.innerHTML = "<p>📭 Henüz kayıt yok.</p>";
+      return;
+    }
+
+    // Tarihe göre sırala (en yeni en üstte)
+    data.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Listeyi oluştur
+    listArea.innerHTML = `
+      <h3>📌 Kayıtlar (${data.length} adet)</h3>
+      <ul style="list-style-type: none; padding: 0;">
+        ${data.map(item => {
+          const formattedDate = new Date(item.date).toLocaleDateString('tr-TR', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long'
+          });
+          
+          return `
+            <li style="margin-bottom: 10px; background: #f1f1f1; padding: 10px; border-radius: 8px;">
+              <strong>📅 ${formattedDate}</strong><br>
+              🔥 Stres: ${item.stress}/10<br>
+              😊 Duygu: ${item.emotion || "Belirtilmemiş"}<br>
+              📝 Not: ${item.note || "Not yok"}
+            </li>
+          `;
+        }).join("")}
+      </ul>
+    `;
+  } catch (err) {
+    console.error("Veri alma hatası:", err);
+    document.getElementById("listArea").innerHTML = `
+      <p style='color:red;'>❌ Kayıtlar yüklenemedi!</p>
+      <p style='color:red; font-size:12px;'>Sunucunun çalıştığından emin olun</p>
+      <p style='color:red; font-size:12px;'>Hata: ${err.message}</p>
+    `;
+  }
 }
 
-  });
+// 🆕 Sayfa yüklendiğinde bugünün tarihini otomatik set et:
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('date').value = new Date().toISOString().split('T')[0];
+});
+
+
+ 
   
   // JS'de gösterim için (fetch sonrası)
       const formattedDate = new Date(record.date).toLocaleDateString('tr-TR', {
@@ -187,23 +266,36 @@
     console.error("Veri alma hatası:", err);
     document.getElementById("listArea").innerHTML = "<p style='color:red;'>Veriler alınamadı!</p>";
   }
-  // İstatistik hesaplama
-    const total = data.length;
-    const avg = (data.reduce((sum, e) => sum + e.stress, 0) / total).toFixed(1);
-    const today = new Date();
-    const last7 = data.filter(e => {
-      const d = new Date(e.date);
-      return (today - d) / (1000 * 60 * 60 * 24) <= 7;
-    });
-    const last7Avg = (last7.reduce((sum, e) => sum + e.stress, 0) / (last7.length || 1)).toFixed(1);
-    const maxEntry = data.reduce((max, e) => (e.stress > max.stress ? e : max), data[0]);
+  // 🔹 İstatistik Hesaplama
+  if (data.length === 0) return;
 
-    // Duyguların en sık görüleni
-    const emotionCounts = {};
-    data.forEach(e => {
-      if (e.emotion) emotionCounts[e.emotion] = (emotionCounts[e.emotion] || 0) + 1;
-    });
-    const mostEmotion = Object.entries(emotionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "-";
+  const total = data.length;
+  const avgStress = data.reduce((sum, entry) => sum + Number(entry.stress), 0) / total;
+
+  const today = new Date();
+  const last7Days = data.filter(entry => {
+    const entryDate = new Date(entry.date);
+    const diffTime = today - entryDate;
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    return diffDays <= 7;
+  });
+  const last7Avg = last7Days.length > 0
+    ? last7Days.reduce((sum, e) => sum + Number(e.stress), 0) / last7Days.length
+    : 0;
+
+  const maxStressEntry = data.reduce((max, entry) => {
+    return Number(entry.stress) > Number(max.stress) ? entry : max;
+  }, data[0]);
+
+  const emotionCounts = {};
+  data.forEach(entry => {
+    if (entry.emotion && entry.emotion.trim() !== "") {
+      emotionCounts[entry.emotion] = (emotionCounts[entry.emotion] || 0) + 1;
+    }
+  });
+  const mostEmotion = Object.entries(emotionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "-";
+
+
 
     // DOM’a yaz
     document.getElementById("totalRecords").innerText = total;
