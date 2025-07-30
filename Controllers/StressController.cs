@@ -129,6 +129,23 @@ namespace DataMash.API.Controllers
     
         }
 
+        [HttpGet("raw")]
+        public async Task<ActionResult<IEnumerable<object>>> GetRawStressRecords()
+        {
+            var records = await _context.StressRecords
+                .OrderByDescending(s => s.Date)
+                .Select(s => new { 
+                    id = s.Id, 
+                    date = s.Date.ToString("yyyy-MM-dd"),
+                    stress = s.Stress,
+                    emotion = s.Emotion,
+                    note = s.Note
+                })
+                .ToListAsync();
+            
+            return Ok(records);
+        }
+
        
 
 
